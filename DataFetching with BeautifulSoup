@@ -1,0 +1,518 @@
+from Tkinter import *
+import ttk
+from ttk import Combobox
+import Tkinter, Tkconstants, tkFileDialog
+from bs4 import BeautifulSoup
+import urllib2
+import mysearchengine
+
+
+class GUI(Frame):
+    def __init__(self, parent):
+        Frame.__init__(self, parent)
+        self.initUI()
+
+    def initUI(self):
+        self.search_obj = Searcher()
+        self.var = StringVar(self,
+                             value='https://www.sehir.edu.tr/en/announcements/2018-2019-bahar-donemi-ders-programi')
+        self.search_obj.varr = self.var
+
+        label = Label(text="Classroom Finder", fg="white", bg="blue", font=(' ', '20', 'bold'))
+        label.pack(fill=X)
+
+        self.frm1 = Frame(self, borderwidth=2)
+        self.frm2 = Frame(self, borderwidth=2)
+        self.frm3 = Frame(self, borderwidth=2)
+        self.frm4 = Frame(self, borderwidth=2, relief=GROOVE)
+
+        for widget in (self.frm1, self.frm2, self.frm3):
+            widget.pack(ipadx=300, pady=10, fill=X)
+        self.frm4.pack()
+
+        self.url = Label(self, text='Url:')
+        self.url.pack(in_=self.frm1, side=LEFT, padx=5)
+
+        self.url_entry = Entry(self, textvariable=self.search_obj.varr)
+        self.url_entry.pack(in_=self.frm1, side=LEFT, fill=X, expand=True, padx=5)
+
+        self.fetch_button = Button(self, text='Fetch', command=self.command_fetch)
+        self.fetch_button.pack(in_=self.frm2, side=RIGHT, ipadx=20, ipady=10, padx=5)
+
+        self.color = Label(self, bg='red')
+        self.color.pack(in_=self.frm2, side=RIGHT, ipadx=40, padx=20)
+
+        self.filter = Label(self, text='Filters', fg='white', bg='blue', font=(' ', '20', 'bold'))
+        self.filter.pack(in_=self.frm3, side=LEFT)
+
+        self.frm5 = Frame(self, borderwidth=2)
+        self.frm6 = Frame(self, borderwidth=2, relief=GROOVE)
+        self.frm5.pack(in_=self.frm4, padx=10, pady=10, side=LEFT, fill=BOTH, expand=True)
+        self.frm6.pack(in_=self.frm4, padx=10, pady=10, side=LEFT, expand=True)
+
+        self.where = Label(self, text='Where am I?')
+        self.where.grid(in_=self.frm5, row=0, column=0, padx=5, pady=8, sticky=W)
+
+        self.room = Label(self, text='Room')
+        self.room.grid(in_=self.frm5, row=1, column=0, padx=5, pady=8, sticky=W)
+
+        self.start = Label(self, text='Start')
+        self.start.grid(in_=self.frm5, row=2, column=0, padx=5, pady=8, sticky=W)
+
+        self.day = Label(self, text='Day')
+        self.day.grid(in_=self.frm5, row=3, column=0, padx=5, pady=8, sticky=W)
+
+        self.search_button = Button(self, text='Search', command=self.search_command)
+        self.search_button.grid(in_=self.frm5, row=4, column=0, padx=5, pady=8, sticky=E + W + S + N)
+
+        self.label = Label(self, text='        ') # gived a space.
+        self.label.grid(in_=self.frm5, row=0, column=1, padx=5, pady=8)
+
+        self.where_combobox = Combobox(self, width=15, )
+        self.where_combobox.grid(in_=self.frm5, row=0, column=2, padx=5, pady=8)
+
+        self.room_combobox = Combobox(self, width=15)
+        self.room_combobox.grid(in_=self.frm5, row=1, column=2, padx=5, pady=8)
+
+        self.start_combobox = Combobox(self, width=7)
+        self.start_combobox.grid(in_=self.frm5, row=2, column=2, padx=5, pady=8, sticky=W)
+
+        self.end = Label(self, text='End')
+        self.end.grid(in_=self.frm5, row=2, column=2, padx=5, pady=8, sticky=E)
+
+        self.label = Label(self, text='        ')  # to give a space between the labels and comboboxes.
+        self.label.grid(in_=self.frm5, row=0, column=3, padx=5, pady=8)
+
+        self.end_combobox = Combobox(self, width=7)
+        self.end_combobox.grid(in_=self.frm5, row=2, column=4, padx=5, pady=8)
+
+        self.day_combobox = Combobox(self, width=15)
+        self.day_combobox.grid(in_=self.frm5, row=3, column=2, padx=5, pady=8)
+
+        self.where_combobox.bind("<<ComboboxSelected>>", self.buildChosen)
+        self.room_combobox.bind("<<ComboboxSelected>>", self.chosenroom)
+        self.start_combobox.bind("<<ComboboxSelected>>", self.starttimeChosen)
+        self.end_combobox.bind("<<ComboboxSelected>>", self.endtimeChosen)
+        self.day_combobox.bind("<<ComboboxSelected>>", self.dayChosen)
+
+        label = Label(text="Classroom results", fg="white", bg="grey")
+        label.pack(in_=self.frm6, fill=X)
+        self.pack()
+
+        self.scrollbar1 = Scrollbar(self)
+
+        self.tree = ttk.Treeview(self, selectmode=BROWSE, height=13, show="tree headings",
+                                 columns=('Room', "Traffic", "Availability", 'Closenes', 'Overall Score'),
+                                 style="Foo2.Treeview")
+        self.scrollbar1.config(command=self.tree.yview)
+        self.tree.config(yscrollcommand=self.scrollbar1.set)
+        self.scrollbar1.pack(in_=self.frm6, side=RIGHT, fill=Y)
+        self.tree.pack(in_=self.frm6, fill=BOTH, expand=True)
+        self.tree.heading('#0', text='order')
+        self.tree.heading('Room', text='Room')
+        self.tree.heading("Traffic", text="Traffic")
+        self.tree.heading('Availability', text='Availability %')
+        self.tree.heading('Closenes', text='Closenes')
+        self.tree.heading('Overall Score', text='Overall Score')
+        self.tree.column("#0", width=0, stretch=False)
+        self.tree.column('Room', width=78, stretch=False)
+        self.tree.column("Traffic", width=78, stretch=False)
+        self.tree.column('Availability', width=78)
+        self.tree.column('Closenes', width=78)
+        self.tree.column('Overall Score', width=78)
+
+    def buildChosen(self, event):
+        self.whr = event.widget.get()
+        self.whr_valuesCombo(self.whr)# when a build is selected, the room number should be change accordingly
+
+    def chosenroom(self, event):
+        self.room = event.widget.get()
+
+    def starttimeChosen(self, event):
+        self.starttime = event.widget.get()
+
+    def endtimeChosen(self, event):
+        self.endtime = event.widget.get()
+
+    def dayChosen(self, event):
+        self.day = event.widget.get()
+
+    def command_fetch(self):
+        self.color.config(bg='yellow')
+        self.update_idletasks()
+        self.search_obj.fetching_data()  # calling fetch datas
+        whr_lis = []                     #this list to order acad build
+        for name, buld_obj in self.search_obj.buildings_dict.items():
+            whr_lis.append(name)
+            whr_lis.sort()
+            self.where_combobox.config(values=whr_lis)
+            self.where_combobox.current(0)
+
+        self.whr_valuesCombo('ACAD BUILD 1')   # for the default value of where combobox
+
+        self.start_combobox.config(
+            values=["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"])
+        self.start_combobox.current(0)
+        self.end_combobox.config(
+            values=["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"])
+        self.end_combobox.current(10)
+        self.day_combobox.config(values=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
+        self.day_combobox.current(0)
+        self.color.config(bg='green')
+
+
+    def whr_valuesCombo(self, value):
+        self.room_lis = []                # this list gives the room number according to selected acad build
+        for b_nm, b_obj in self.search_obj.buildings_dict.items():
+            if value == b_nm:
+                for cls in b_obj.clsroom_list:
+                    self.room_lis.append(cls.floor_num + cls.room_num)
+                    self.room_lis.sort()
+                    self.room_combobox.config(values=self.room_lis)
+                    self.room_combobox.current(0)
+        return self.room_lis
+
+    def search_command(self):
+        # this method helps that when just one or two how many do you want to select, it avoid the errors and give the valid number which was not chosen.
+        self.tree.delete(*self.tree.get_children())
+        resutl=[]
+        try:
+            buildin = self.whr # if the user does not chose the build it give which the first.
+            resutl.append(buildin)
+        except:
+            buildin='ACAD BUILD 1'
+            resutl.append(buildin)
+
+        room = self.room                                     # this values are differet from other because it won't give an error while it is not chosen.
+        if room not in self.whr_valuesCombo(resutl[0]):
+            resutl.append(self.whr_valuesCombo(resutl[0])[0]) # thanks to this line it will give the first value of box for example acad build2= 107.
+        else:
+            resutl.append(room)
+        day = self.day #this same with room situation
+        if day not in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]:
+            resutl.append('Monday')
+        else:
+            resutl.append(day)
+        try:
+            start=self.starttime # this same with build situation
+            resutl.append(start)
+        except:
+            start='09:00'
+            resutl.append(start)
+
+        try:
+            end = self.endtime
+            resutl.append(end)
+        except:
+            end='19:00'
+            resutl.append(end)
+        self.search_obj.search(resutl[0], resutl[1], resutl[2], resutl[3], resutl[4])
+        self.insert(resutl[2])
+
+
+    def insert(self,day):
+        sort = [] # to sort which will insert treeview
+        for objects in self.search_obj.normalize_searchitem_list: # normalize list include SearcResultItem.
+            for d, tr_score in objects.cls_obj.traffic_score.items(): # to reach traffic scores.
+                if d == day: # as the traffic score dict include all day, that isn't chosen eliminated.
+                    overall = float(tr_score) + float(objects.avail_score) + float(objects.closeness_score)
+                    sort.append((overall, objects))
+
+        for over, objects in sorted(sort, reverse=True): #this get sorted list according to level of overall
+            for d, tr_score in objects.cls_obj.traffic_score.items():
+                if d == day: # here it will added
+                    self.tree.insert('', END, values=(
+                    objects.cls_obj.building_num + objects.cls_obj.floor_num + objects.cls_obj.room_num,
+                    round(float(tr_score),4), round(float(objects.avail_score),4), round(float(objects.closeness_score),4), round(float(over),4)))
+        self.search_obj.normalize_searchitem_list=[]
+
+
+class Classroom:
+    def __init__(self, building_num, floor_num, room_num):
+        self.building_num = building_num
+        self.floor_num = floor_num
+        self.room_num = room_num
+        self.traffic_score = {}
+
+    def get_distance_from(self, clsroom_obj): # in this method the distence will computed
+        Building = abs(int(self.building_num) - int(clsroom_obj.building_num)) * 100
+        Floor = abs(int(self.floor_num) - int(clsroom_obj.floor_num)) * 200
+        Room = abs(int(self.room_num) - int(clsroom_obj.room_num)) * 50
+
+        Closness = Building + Floor + Room
+        if Closness==0: # when the closness 0 it means itself
+            Closness+=100
+        return Closness
+
+
+class Building:
+    def __init__(self, name):
+        self.name = name
+        self.clsroom_list = [] #it list include Clasroom object
+
+
+class Day:
+    def __init__(self, name):
+        self.name = name
+        self.time_slot = {} #it dict include
+
+
+class SearchResultItem:
+    def __init__(self, cls_obj, closeness_score=0.0, avail_score=0.0):
+        self.cls_obj = cls_obj
+        self.avail_score =avail_score
+        self.closeness_score = closeness_score
+        self.available_slots = []
+
+    def compute_availability_score(self, start_time, end_time): # it will compute availability according to available slots
+        chosen_time = range(int(start_time[0:2]), int(end_time[0:2]))
+        available_time = 0
+        for times in self.available_slots:
+            if times in chosen_time:
+                available_time += 1 # the available slots include busy times which is perrioded 1 time. so the len of which are in the chosen time is A.
+        N = len(chosen_time) * 60
+        A = (len(chosen_time) - available_time) * 60
+        R = 100 * float(A) / float(N)
+
+        return R
+
+
+class Searcher:
+    def __init__(self):
+        self.days_dict = {}  # day_name:day_obj
+        self.buildings_dict = {}  # buld_name:buld_obj
+        self.normalize_searchitem_list=[]
+
+    def fetching_data(self):
+        self.getted = urllib2.urlopen(self.varr.get())
+        self.html_doc = self.getted.read()
+        self.soup_obj = BeautifulSoup(self.html_doc, 'html.parser')
+        text_of_need = self.soup_obj.find_all('p', class_='MsoNormal')
+        lis = []
+        for tag in text_of_need:
+            iti = tag.get_text().strip()
+            lis.append(iti)
+        self.data_list = []
+        for i in range(len(lis)):
+            if 'ACAD BUILD' in lis[i] and 'KEMAL KARPAT' not in lis[i] and ' LAB BUILD' not in lis[i]: # it will eliminate unwanted value
+                if '\r\n  ' in lis[i]:
+                    acad_split = lis[i].split('\r\n  ')
+                    self.data_list.append([lis[i - 2], lis[i - 1], acad_split[0]])
+                    self.data_list.append([lis[i - 2], lis[i - 1], acad_split[1]])
+                else:
+                    self.data_list.append([lis[i - 2], lis[i - 1], lis[i]])
+
+
+        update_data = []
+        for one_data in self.data_list: # to avaoid the un wanter characters and split accordingly
+            day_split = one_data[0].split('\r\n  ')
+            time_split = one_data[1].split('\r\n  ')
+            build_split = one_data[2].split(' #')
+
+            # this cod to split days and time which has classes two days  a weak
+
+            if len(day_split) == 2 and len(time_split) == 2:
+                update_data.append([day_split[0], time_split[0], build_split[0], build_split[1]])
+                update_data.append([day_split[1], time_split[1], build_split[0], build_split[1]])
+            elif len(day_split) == 2 and len(time_split) == 1:
+                update_data.append([day_split[0], time_split[0], build_split[0], build_split[1]])
+                update_data.append([day_split[1], time_split[0], build_split[0], build_split[1]])
+            elif len(day_split) == 1 and len(time_split) == 2:
+                update_data.append([day_split[0], time_split[0], build_split[0], build_split[1]])
+                update_data.append([day_split[0], time_split[1], build_split[0], build_split[1]])
+            else:
+                update_data.append([day_split[0], time_split[0], build_split[0], build_split[1]])
+
+        building_dict = {}
+        for data in update_data:
+            building_dict.setdefault(data[2], {})
+            building_dict[data[2]][data[3]] = data[3][-3:]
+
+        for b, ro in building_dict.items():  # b is the building name , ro is the room dict
+            buil = Building(b)
+            for room, num in ro.items():  # room is the room num with building number information, num is room number that we use in the gui combobox
+                self.clsroom = Classroom(room[0], room[1], room[2:])
+                buil.clsroom_list.append(self.clsroom)
+            self.buildings_dict[buil.name] = buil
+
+        self.busy_class_time = {} # it is include classes for key and the value is dict in the structere of {clasroom:{day:[list of busy time of that class at that day}}
+        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+        for data in update_data:
+            self.busy_class_time.setdefault(data[3], {})
+            self.busy_class_time[data[3]].setdefault(data[0], [])
+            for i in range(int(data[1][0:2]), int(data[1][-5:-3])):
+                if i < 19 and i not in self.busy_class_time[data[3]][data[0]]:
+                    self.busy_class_time[data[3]][data[0]].append(i)
+
+        for ke,va in self.busy_class_time.items():  #ke>> clasroom , va>> dict of day-time
+            for d in days:
+                if d not in va:
+                    va[d]=[]
+
+        self.available_class_time = {}    # key>> classrom , value>> {day:[available time of that day for that clasroom}}
+        for clas, daydict in self.busy_class_time.items():
+            self.available_class_time.setdefault(clas, {})
+            for day, time in daydict.items():
+                self.available_class_time[clas].setdefault(day, [])
+                for i in range(9, 19):
+                    if i not in time:
+                        self.available_class_time[clas][day].append(i)
+
+       # set of for loos and if-else pairs at the below built the self.day_dict which is the atribute of Days class objects
+
+        for clas_available, day_time_dict in self.available_class_time.items():
+            for day, available_time in day_time_dict.items():
+                if day != 'Saturday':
+                    if day not in self.days_dict:
+                        objof_day = Day(day)
+                        for one_time in available_time:
+                            if one_time not in objof_day.time_slot:
+                                objof_day.time_slot.setdefault(one_time, [])
+                                objof_day.time_slot[one_time].append(clas_available)
+                            else:
+                                objof_day.time_slot[one_time].append(clas_available)
+
+                        self.days_dict[objof_day.name] = objof_day
+                    else:
+                        for ke, va in self.days_dict.items():
+                            if ke == day:
+                                for one_time in available_time:
+                                    if one_time not in va.time_slot:
+                                        va.time_slot.setdefault(one_time, [])
+                                        va.time_slot[one_time].append(clas_available)
+                                    else:
+                                        va.time_slot[one_time].append(clas_available)
+
+        self.compute_traffic_scores()
+
+    def compute_traffic_scores(self):
+        total_hour = float(19 - 9)
+        trafic_score = {}
+
+        for room, daytime in self.busy_class_time.items():
+            for day, time in daytime.items():
+                used = len(time)
+                if used!=0:
+                    self.traffic_scr = float(used) / total_hour
+                    trafic_score.setdefault(room, {})
+                    trafic_score[room][day] = float(self.traffic_scr)
+                elif used==0:
+                    self.traffic_scr = 0.1 / total_hour
+                    trafic_score.setdefault(room, {})
+                    trafic_score[room][day] = self.traffic_scr
+
+        normailze_trafic_score = {}
+        list=[]
+        for rom, valuedict in trafic_score.items():
+            list.append([rom,valuedict])
+        for i in list:
+            normalize = mysearchengine.normalizescores(i[1], True)
+            normailze_trafic_score[i[0]] = normalize
+
+        #put the clasroom object to day_dicts value
+        for name, bul_obj in self.buildings_dict.items():
+            for clas_obj in bul_obj.clsroom_list:
+                for cls, day_score in normailze_trafic_score.items():
+                    if cls==clas_obj.building_num+ clas_obj.floor_num+clas_obj.room_num:
+                        for d, score in day_score.items():
+                            clas_obj.traffic_score[d] = score
+
+    def compute_availability_scores(self, s, e):
+        all_thing = {}
+        chosen_time = range(int(s[0:2]), int(e[0:2]))
+        for room, busy_time in self.busy_class_time.items():
+            for day, times in busy_time.items():
+                all_thing.setdefault(day, {})
+                all_thing[day].setdefault(room, 0)
+                for time in times:
+                    if time in chosen_time:
+                        all_thing[day][room] += 1
+
+        availability = {}      # {day{clasroom:avability_score}}
+        for day, busy_class in all_thing.items():
+            availability.setdefault(day, {})
+            for clas, busy_times in busy_class.items():
+                N = len(chosen_time) * 60
+                A = (len(chosen_time) - busy_times) * 60
+                R = 100 * float(A) / float(N)
+                availability[day][clas] = R
+
+        normalize_available = {}
+        for days, numbers in availability.items():
+            normalize = mysearchengine.normalizescores(numbers, False)
+            normalize_available[days] = normalize
+
+        return normalize_available
+
+    def compute_closeness_scores(self, build, room):
+        closness_dict = {}
+        for name, buildobj in self.buildings_dict.items():
+            for cls_obj in buildobj.clsroom_list:
+                if cls_obj.building_num + cls_obj.floor_num + cls_obj.room_num != build[-1] + room:
+                    Building = abs(int(cls_obj.building_num) - int(build[-1])) * 100
+                    Floor = abs(int(cls_obj.floor_num) - int(room[0])) * 200
+                    Room = abs(int(cls_obj.room_num) - int(room[1:])) * 50
+
+                    Closness = Building + Floor + Room
+                    closness_dict[cls_obj.building_num + cls_obj.floor_num + cls_obj.room_num] = Closness
+        normalize_clossnes = mysearchengine.normalizescores(closness_dict, True)
+
+        return normalize_clossnes
+
+    def search(self, build, room,d,s,e):
+        chosen_class = Classroom(build[-1], room[0], room[2:])
+        search_item_result_list = []
+        #built SearchResultItem objects
+        for building_name, building_obj in self.buildings_dict.items():
+            for clasroom_obj in building_obj.clsroom_list:
+                search_item_result_list.append(SearchResultItem(clasroom_obj))
+
+        to_normalize_result = {}
+        for object in search_item_result_list:
+            reach_class = object.cls_obj
+            distance = reach_class.get_distance_from(chosen_class)
+            to_normalize_result[object] = distance
+        normalize_result = mysearchengine.normalizescores(to_normalize_result, True)
+
+        acordingto_day_ofroom={}
+        for room,daytimedict in self.busy_class_time.items():
+            if d not in daytimedict:
+                acordingto_day_ofroom[room]=[]
+            for day, time in daytimedict.items():
+                if d==day:
+                    acordingto_day_ofroom[room]=time
+
+        #built the   objects ofSearchResultItem class attribute
+        for searcitem in search_item_result_list:
+            clasobj=searcitem.cls_obj
+            for room, times in acordingto_day_ofroom.items():
+                if room == clasobj.building_num + clasobj.floor_num + clasobj.room_num:
+                    for ti in times:
+                        searcitem.available_slots.append(ti)
+
+        availibility_dict={}
+        for searchresul in search_item_result_list:
+            avail=searchresul.compute_availability_score(s,e)
+            availibility_dict[searchresul]=avail
+
+        normalize_availity_dict=mysearchengine.normalizescores(availibility_dict,False)
+
+# put classroom objects as SearchResultItem attributes
+        for building_name, building_obj in self.buildings_dict.items():
+            for clasroom_obj in building_obj.clsroom_list:
+                for obj, nor_distance in normalize_result.items():
+                    for obje, nor_ava in normalize_availity_dict.items():
+                        if clasroom_obj== obj.cls_obj and clasroom_obj==obje.cls_obj:
+                            new_obje = SearchResultItem(clasroom_obj,nor_distance, nor_ava)
+                            self.normalize_searchitem_list.append(new_obje)
+
+def main():
+    root = Tk()
+    root.title('tk')
+    root.geometry("900x550+100+100")
+    GUI(root)
+    ttk.Treeview(root)
+    Scrollbar(root)
+    root.mainloop()
+main()
+
